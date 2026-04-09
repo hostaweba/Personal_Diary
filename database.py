@@ -60,6 +60,15 @@ class DatabaseManager:
         """)
         self.conn.commit()
 
+    def clean_orphaned_tags(self):
+        """MAGIC SWEEPER: Automatically deletes tags from the master database if no entry is using them."""
+        c = self.conn.cursor()
+        c.execute("""
+            DELETE FROM tags 
+            WHERE id NOT IN (SELECT DISTINCT tag_id FROM entry_tags)
+        """)
+        self.conn.commit()
+
     # ---------------- Entry Operations ----------------
     def add_entry(self, title, content, tags=None, images=None, category=None):
         tags = tags or []
@@ -76,15 +85,23 @@ class DatabaseManager:
         self.conn.commit()
         return entry_id
 
-    def update_entry(self, entry_id, title, content, tags=None, images=None, category=None):
+    def update_entry(self, entry_id, title, content, tags=None, images=None, category=None, update_timestamp=True):
         tags = tags or []
         images = images or []
-        now = datetime.now().isoformat()
         c = self.conn.cursor()
-        c.execute(
-            "UPDATE entries SET title=?, content=?, updated_at=?, category=? WHERE id=?",
-            (title, content, now, category, entry_id)
-        )
+        
+        if update_timestamp:
+            now = datetime.now().isoformat()
+            c.execute(
+                "UPDATE entries SET title=?, content=?, updated_at=?, category=? WHERE id=?",
+                (title, content, now, category, entry_id)
+            )
+        else:
+            c.execute(
+                "UPDATE entries SET title=?, content=?, category=? WHERE id=?",
+                (title, content, category, entry_id)
+            )
+            
         self._update_tags(entry_id, tags)
         self._update_images(entry_id, images)
         self.conn.commit()
@@ -95,6 +112,7 @@ class DatabaseManager:
         c.execute("DELETE FROM entry_tags WHERE entry_id=?", (entry_id,))
         c.execute("DELETE FROM entry_images WHERE entry_id=?", (entry_id,))
         self.conn.commit()
+        self.clean_orphaned_tags() # Triggers sweeper after entry deletion
 
     def get_entries(self):
         c = self.conn.cursor()
@@ -124,6 +142,23 @@ class DatabaseManager:
             c.execute("SELECT id FROM tags WHERE name=?", (tag,))
             tag_id = c.fetchone()["id"]
             c.execute("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)", (entry_id, tag_id))
+        self.conn.commit()
+        self.clean_orphaned_tags() # Triggers sweeper after updating tags
+
+    def set_entry_tags(self, entry_id, tags):
+        """Directly overwrites tags for an entry from main.py"""
+        self._update_tags(entry_id, tags)
+
+    def delete_tag(self, tag_name):
+        """Forcefully deletes a tag everywhere globally"""
+        c = self.conn.cursor()
+        c.execute("SELECT id FROM tags WHERE name=?", (tag_name,))
+        row = c.fetchone()
+        if row:
+            tag_id = row["id"]
+            c.execute("DELETE FROM entry_tags WHERE tag_id=?", (tag_id,))
+            c.execute("DELETE FROM tags WHERE id=?", (tag_id,))
+            self.conn.commit()
 
     # ---------------- Image Operations ----------------
     def _update_images(self, entry_id, images):
@@ -150,6 +185,16 @@ class DatabaseManager:
         c = self.conn.cursor()
         c.execute("SELECT id, name FROM categories ORDER BY name ASC")
         return [(row["id"], row["name"]) for row in c.fetchall()]
+
+    def get_category(self, identifier):
+        """Fetches a specific category by its ID or Name for the UI."""
+        c = self.conn.cursor()
+        if isinstance(identifier, int) or str(identifier).isdigit():
+            c.execute("SELECT id, name FROM categories WHERE id=?", (int(identifier),))
+        else:
+            c.execute("SELECT id, name FROM categories WHERE name=?", (identifier,))
+        row = c.fetchone()
+        return (row["id"], row["name"]) if row else None
 
     def update_entry_category(self, entry_id, category_id):
         c = self.conn.cursor()
