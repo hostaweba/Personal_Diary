@@ -56,13 +56,20 @@ class DatabaseManager:
         )
         """)
         
-        # Categories table
+        # Categories table - UPDATED with color column
         c.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
+            name TEXT UNIQUE,
+            color TEXT DEFAULT '#88C0D0'
         )
         """)
+        
+        # Safely upgrade existing databases to include the color column
+        try:
+            c.execute("ALTER TABLE categories ADD COLUMN color TEXT DEFAULT '#88C0D0'")
+        except sqlite3.OperationalError:
+            pass  # Column already exists, safe to ignore
         
         self.conn.commit()
 
@@ -186,26 +193,26 @@ class DatabaseManager:
         return [(row["uuid"], row["name"]) for row in c.fetchall()]
 
     # ---------------- Category Operations ----------------
-    def add_category(self, name):
+    def add_category(self, name, color="#88C0D0"):
         c = self.conn.cursor()
-        c.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
+        c.execute("INSERT OR IGNORE INTO categories (name, color) VALUES (?, ?)", (name, color))
         self.conn.commit()
 
     def get_categories(self):
         c = self.conn.cursor()
-        c.execute("SELECT id, name FROM categories ORDER BY name ASC")
-        return [(row["id"], row["name"]) for row in c.fetchall()]
+        c.execute("SELECT id, name, color FROM categories ORDER BY name ASC")
+        return [(row["id"], row["name"], row["color"]) for row in c.fetchall()]
 
     def get_category(self, identifier):
         """Fetches a specific category by its ID or Name for the UI."""
         c = self.conn.cursor()
         if isinstance(identifier, int) or str(identifier).isdigit():
-            c.execute("SELECT id, name FROM categories WHERE id=?", (int(identifier),))
+            c.execute("SELECT id, name, color FROM categories WHERE id=?", (int(identifier),))
         else:
-            c.execute("SELECT id, name FROM categories WHERE name=?", (identifier,))
+            c.execute("SELECT id, name, color FROM categories WHERE name=?", (identifier,))
             
         row = c.fetchone()
-        return (row["id"], row["name"]) if row else None
+        return (row["id"], row["name"], row["color"]) if row else None
 
     def update_entry_category(self, entry_id, category_id):
         """Moves an entry to a new category, or removes it if category_id is None"""
