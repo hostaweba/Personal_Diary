@@ -683,23 +683,103 @@ class EditTagsDialog(QDialog):
         panel_layout.addLayout(btn_layout)
         layout.addWidget(self.panel)
 
+class FolderCreateDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.resize(340, 270)
+        self.selected_color = "#88C0D0" # Default cyan
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.panel = GlassPanel(self)
+        self.panel.setStyleSheet("""
+            GlassPanel { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(43, 35, 51, 0.96), stop:1 rgba(20, 22, 26, 0.98));
+            border: 1px solid rgba(255, 255, 255, 0.08); border-top: 1px solid rgba(136, 192, 208, 0.6); border-radius: 16px; }
+        """)
+
+        panel_layout = QVBoxLayout(self.panel)
+        panel_layout.setContentsMargins(25, 25, 25, 25)
+
+        title = QLabel("Create Folder")
+        title.setStyleSheet("font-family: 'Dancing Script', cursive; font-size: 32px; color: #88C0D0; background: transparent; margin-bottom: 5px;")
+        title.setAlignment(Qt.AlignCenter)
+        panel_layout.addWidget(title)
+
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Folder name...")
+        self.input_field.setStyleSheet("QLineEdit { background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; color: #ECEFF4; font-size: 14px; } QLineEdit:focus { border: 1px solid rgba(136, 192, 208, 0.8); background: rgba(0, 0, 0, 0.6); }")
+        panel_layout.addWidget(self.input_field)
+        
+        # Color picker section
+        color_lbl = QLabel("Folder Color:")
+        color_lbl.setStyleSheet("color: #81A1C1; font-size: 12px; margin-top: 10px; background: transparent;")
+        panel_layout.addWidget(color_lbl)
+        
+        self.color_layout = QHBoxLayout()
+        self.color_buttons = []
+        # Your aesthetic Nord palette colors
+        colors = ["#BF616A", "#D08770", "#EBCB8B", "#A3BE8C", "#B48EAD", "#88C0D0", "#81A1C1"]
+        
+        for c in colors:
+            btn = QPushButton()
+            btn.setFixedSize(26, 26)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setProperty("color_val", c)
+            btn.clicked.connect(self._on_color_clicked)
+            self._update_btn_style(btn, c == self.selected_color)
+            self.color_layout.addWidget(btn)
+            self.color_buttons.append(btn)
+            
+        self.color_layout.addStretch()
+        panel_layout.addLayout(self.color_layout)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(0, 15, 0, 0)
+        btn_cancel = QPushButton("Cancel")
+        btn_ok = QPushButton("Create")
+
+        btn_style = "QPushButton { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 10px; color: #ECEFF4; font-weight: bold; text-transform: uppercase; } QPushButton:hover { background: rgba(136, 192, 208, 0.2); border-color: #88C0D0; color: #88C0D0; }"
+        btn_cancel.setStyleSheet(btn_style)
+        btn_ok.setStyleSheet(btn_style)
+
+        btn_cancel.clicked.connect(self.reject)
+        btn_ok.clicked.connect(self.accept)
+        self.input_field.returnPressed.connect(self.accept)
+
+        btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(btn_ok)
+        panel_layout.addLayout(btn_layout)
+
+        layout.addWidget(self.panel)
+        
+    def _update_btn_style(self, btn, is_selected):
+        c = btn.property("color_val")
+        border = "2px solid white" if is_selected else "1px solid rgba(255,255,255,0.2)"
+        btn.setStyleSheet(f"QPushButton {{ background-color: {c}; border: {border}; border-radius: 13px; }}")
+        
+    def _on_color_clicked(self):
+        sender = self.sender()
+        self.selected_color = sender.property("color_val")
+        for btn in self.color_buttons:
+            self._update_btn_style(btn, btn == sender)
+
+    def get_data(self):
+        return self.input_field.text(), self.selected_color
+
 class EntryCard(QWidget):
-    def __init__(self, title: str, updated: str, tags: Optional[List[str]] = None, category_name: Optional[str] = None):
+    def __init__(self, title: str, updated: str, tags: Optional[List[str]] = None, category_name: Optional[str] = None, category_color: Optional[str] = None):
         super().__init__()
         self.setAttribute(Qt.WA_StyledBackground, True)
 
         # Dynamic Magical Glass Highlighting across the entire card
-        if category_name:
-            glass_themes = [
-                ("rgba(191, 97, 106, 0.25)", "rgba(191, 97, 106, 0.05)", "rgba(191, 97, 106, 0.5)"), # Red
-                ("rgba(208, 135, 112, 0.25)", "rgba(208, 135, 112, 0.05)", "rgba(208, 135, 112, 0.5)"), # Orange
-                ("rgba(235, 203, 139, 0.25)", "rgba(235, 203, 139, 0.05)", "rgba(235, 203, 139, 0.5)"), # Yellow
-                ("rgba(163, 190, 140, 0.25)", "rgba(163, 190, 140, 0.05)", "rgba(163, 190, 140, 0.5)"), # Green
-                ("rgba(180, 142, 173, 0.25)", "rgba(180, 142, 173, 0.05)", "rgba(180, 142, 173, 0.5)"), # Purple
-                ("rgba(136, 192, 208, 0.25)", "rgba(136, 192, 208, 0.05)", "rgba(136, 192, 208, 0.5)"), # Cyan
-                ("rgba(129, 161, 193, 0.25)", "rgba(129, 161, 193, 0.05)", "rgba(129, 161, 193, 0.5)")  # Blue
-            ]
-            theme = glass_themes[len(category_name) % len(glass_themes)]
+        if category_name and category_color:
+            # Convert hex to RGBA for the glass effect
+            c = QColor(category_color)
+            r, g, b = c.red(), c.green(), c.blue()
+            theme = (f"rgba({r}, {g}, {b}, 0.25)", f"rgba({r}, {g}, {b}, 0.05)", f"rgba({r}, {g}, {b}, 0.5)")
             
             self.setStyleSheet(f"""
                 EntryCard {{
@@ -1224,7 +1304,7 @@ class DiaryApp(QMainWindow):
         self.folder_combo.addItem("📂 All Folders", None)
         try:
             if hasattr(self.db, "get_categories"):
-                for cid, name in self.db.get_categories():
+                for cid, name, color in self.db.get_categories():
                     self.folder_combo.addItem(f"📁 {name}", name)
                     if self.active_folder_name == name:
                         self.folder_combo.setCurrentIndex(self.folder_combo.count() - 1)
@@ -1368,7 +1448,7 @@ class DiaryApp(QMainWindow):
             self.show_status(f"Deleted Tag: {tag}")
 
     # ---------- Entry Helpers ----------
-    def _create_entry_item(self, row: dict, tags: List[str], category_name: Optional[str] = None, target_list: QListWidget = None) -> QListWidgetItem:
+    def _create_entry_item(self, row: dict, tags: List[str], category_name: Optional[str] = None, category_color: Optional[str] = None, target_list: QListWidget = None) -> QListWidgetItem:
         if target_list is None:
             target_list = self.entry_list
             
@@ -1383,7 +1463,7 @@ class DiaryApp(QMainWindow):
             display_date = str(raw_date)[:16] or "—"
             
         target_list.addItem(item)
-        target_list.setItemWidget(item, EntryCard(row.get("title"), display_date, tags, category_name))
+        target_list.setItemWidget(item, EntryCard(row.get("title"), display_date, tags, category_name, category_color))
         return item
 
     def _stable_sort(self, rows: List[dict]) -> List[dict]:
@@ -1412,8 +1492,12 @@ class DiaryApp(QMainWindow):
         filtered, q = [], (search_text or "").strip().lower()
 
         for r in rows:
+            cat_name, cat_color = None, None
             try:
-                cat_name = self.db.get_category(r.get("category_id") or r.get("category"))[1] if hasattr(self.db, "get_category") else r.get("category")
+                cat_info = self.db.get_category(r.get("category_id") or r.get("category"))
+                if cat_info:
+                    cat_name = cat_info[1]
+                    cat_color = cat_info[2]
             except Exception:
                 cat_name = r.get("category")
             
@@ -1437,15 +1521,18 @@ class DiaryApp(QMainWindow):
                     if q not in content:
                         continue
 
-            r["__tags"], r["__category_name"] = tags, cat_name
+            r["__tags"] = tags
+            r["__category_name"] = cat_name
+            r["__category_color"] = cat_color
             filtered.append(r)
 
         self.entries_cache = self._stable_sort(filtered)
         self.entry_list.blockSignals(True)
         self.entry_list.clear()
-        
+
         for r in self.entries_cache:
-            self._create_entry_item(r, r["__tags"], r["__category_name"])
+            self._create_entry_item(r, r["__tags"], r["__category_name"], r.get("__category_color"))
+        
             
         self.entry_list.blockSignals(False)
         self.load_tags()
@@ -1580,7 +1667,8 @@ class DiaryApp(QMainWindow):
                     
         self.dash_date_label.setText(f"{len(matched)} Entries on {date.toString('MMMM d, yyyy')}")
         for r in matched:
-            self._create_entry_item(r, r.get("__tags", []), r.get("__category_name"), self.dash_entry_list)
+            # BUG FIXED: Added r.get("__category_color") to fix argument offset
+            self._create_entry_item(r, r.get("__tags", []), r.get("__category_name"), r.get("__category_color"), self.dash_entry_list)
 
     def _on_dash_list_item_clicked(self, item: QListWidgetItem):
         self._select_in_list(item.data(Qt.UserRole))
@@ -1725,14 +1813,14 @@ class DiaryApp(QMainWindow):
         move_menu = menu.addMenu("Move to Folder")
         cats = self.db.get_categories() if hasattr(self.db, "get_categories") else []
         
-        # New feature: Move to None (Remove from folder)
+        # Move to None (Remove from folder)
         move_menu.addAction("None (Remove from folder)").triggered.connect(
             lambda checked=False: self._move_selected_entry_to_category(None)
         )
         
         if cats:
             move_menu.addSeparator()
-            for cid, name in cats:
+            for cid, name, color in cats:
                 move_menu.addAction(name).triggered.connect(
                     lambda checked=False, _c=cid: self._move_selected_entry_to_category(_c)
                 )
@@ -1743,15 +1831,17 @@ class DiaryApp(QMainWindow):
         menu.exec(self.entry_list.mapToGlobal(pos))
 
     def _create_category_from_menu(self):
-        dlg = GlassInputDialog("Create Folder", "Folder name...", self)
-        if dlg.exec() == QDialog.Accepted and (n := dlg.get_text().strip()):
-            try: 
-                self.db.add_category(n)
-                self._update_folder_list()
-                self.load_entries(keep_selection=True)
-                self.show_status("Folder created")
-            except Exception:
-                pass
+        dlg = FolderCreateDialog(self)
+        if dlg.exec() == QDialog.Accepted:
+            name, color = dlg.get_data()
+            if name.strip():
+                try: 
+                    self.db.add_category(name.strip(), color)
+                    self._update_folder_list()
+                    self.load_entries(keep_selection=True)
+                    self.show_status("Folder created")
+                except Exception:
+                    pass
 
     def _delete_current_folder(self):
         if not self.active_folder_name:
@@ -1760,7 +1850,7 @@ class DiaryApp(QMainWindow):
 
         if QMessageBox.question(self, "Delete Folder", f"Are you sure you want to delete the folder '{self.active_folder_name}'?\n\nEntries inside will NOT be deleted, but will be removed from this folder.", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             cats = self.db.get_categories() if hasattr(self.db, "get_categories") else []
-            cat_id = next((cid for cid, name in cats if name == self.active_folder_name), None)
+            cat_id = next((cid for cid, name, color in cats if name == self.active_folder_name), None)
 
             if cat_id is not None:
                 # 1. Prevent Foreign Key crashes by safely moving all entries out of this folder first
@@ -1822,8 +1912,6 @@ class DiaryApp(QMainWindow):
                 self.show_status("Moved entry")
             else:
                 QMessageBox.warning(self, "Database Error", "Failed to clear the folder. Ensure your database.py supports setting the category to None/NULL.")
-
-    
 
     def _show_editor_context_menu(self, pos):
         menu = QMenu(self)
