@@ -13,6 +13,7 @@ class DatabaseManager:
 
     def create_tables(self):
         c = self.conn.cursor()
+        
         # Entries table
         c.execute("""
         CREATE TABLE IF NOT EXISTS entries (
@@ -24,6 +25,7 @@ class DatabaseManager:
             category TEXT
         )
         """)
+        
         # Tags table
         c.execute("""
         CREATE TABLE IF NOT EXISTS tags (
@@ -31,6 +33,7 @@ class DatabaseManager:
             name TEXT UNIQUE
         )
         """)
+        
         # Entry-Tag relation
         c.execute("""
         CREATE TABLE IF NOT EXISTS entry_tags (
@@ -41,6 +44,7 @@ class DatabaseManager:
             FOREIGN KEY(tag_id) REFERENCES tags(id)
         )
         """)
+        
         # Images table
         c.execute("""
         CREATE TABLE IF NOT EXISTS entry_images (
@@ -51,6 +55,7 @@ class DatabaseManager:
             FOREIGN KEY(entry_id) REFERENCES entries(id)
         )
         """)
+        
         # Categories table
         c.execute("""
         CREATE TABLE IF NOT EXISTS categories (
@@ -58,6 +63,7 @@ class DatabaseManager:
             name TEXT UNIQUE
         )
         """)
+        
         self.conn.commit()
 
     def clean_orphaned_tags(self):
@@ -74,12 +80,14 @@ class DatabaseManager:
         tags = tags or []
         images = images or []
         now = datetime.now().isoformat()
+        
         c = self.conn.cursor()
         c.execute(
             "INSERT INTO entries (title, content, created_at, updated_at, category) VALUES (?,?,?,?,?)",
             (title, content, now, now, category)
         )
         entry_id = c.lastrowid
+        
         self._update_tags(entry_id, tags)
         self._update_images(entry_id, images)
         self.conn.commit()
@@ -112,7 +120,7 @@ class DatabaseManager:
         c.execute("DELETE FROM entry_tags WHERE entry_id=?", (entry_id,))
         c.execute("DELETE FROM entry_images WHERE entry_id=?", (entry_id,))
         self.conn.commit()
-        self.clean_orphaned_tags() # Triggers sweeper after entry deletion
+        self.clean_orphaned_tags()  # Triggers sweeper after entry deletion
 
     def get_entries(self):
         c = self.conn.cursor()
@@ -142,8 +150,9 @@ class DatabaseManager:
             c.execute("SELECT id FROM tags WHERE name=?", (tag,))
             tag_id = c.fetchone()["id"]
             c.execute("INSERT INTO entry_tags (entry_id, tag_id) VALUES (?,?)", (entry_id, tag_id))
+            
         self.conn.commit()
-        self.clean_orphaned_tags() # Triggers sweeper after updating tags
+        self.clean_orphaned_tags()  # Triggers sweeper after updating tags
 
     def set_entry_tags(self, entry_id, tags):
         """Directly overwrites tags for an entry from main.py"""
@@ -154,6 +163,7 @@ class DatabaseManager:
         c = self.conn.cursor()
         c.execute("SELECT id FROM tags WHERE name=?", (tag_name,))
         row = c.fetchone()
+        
         if row:
             tag_id = row["id"]
             c.execute("DELETE FROM entry_tags WHERE tag_id=?", (tag_id,))
@@ -193,17 +203,45 @@ class DatabaseManager:
             c.execute("SELECT id, name FROM categories WHERE id=?", (int(identifier),))
         else:
             c.execute("SELECT id, name FROM categories WHERE name=?", (identifier,))
+            
         row = c.fetchone()
         return (row["id"], row["name"]) if row else None
 
     def update_entry_category(self, entry_id, category_id):
+        """Moves an entry to a new category, or removes it if category_id is None"""
         c = self.conn.cursor()
+        
+        if category_id is None:
+            # Handles the "Move to None" action
+            c.execute(
+                "UPDATE entries SET category=NULL, updated_at=? WHERE id=?",
+                (datetime.now().isoformat(), entry_id)
+            )
+        else:
+            c.execute("SELECT name FROM categories WHERE id=?", (category_id,))
+            row = c.fetchone()
+            if row:
+                category_name = row["name"]
+                c.execute(
+                    "UPDATE entries SET category=?, updated_at=? WHERE id=?",
+                    (category_name, datetime.now().isoformat(), entry_id)
+                )
+                
+        self.conn.commit()
+
+    def delete_category(self, category_id):
+        """Deletes a folder and removes its reference from all associated entries"""
+        c = self.conn.cursor()
+        
+        # First, find the category name so we can un-link the entries safely
         c.execute("SELECT name FROM categories WHERE id=?", (category_id,))
         row = c.fetchone()
+        
         if row:
             category_name = row["name"]
-            c.execute(
-                "UPDATE entries SET category=?, updated_at=? WHERE id=?",
-                (category_name, datetime.now().isoformat(), entry_id)
-            )
-            self.conn.commit()
+            # Set all entries in this category to NULL (no category)
+            c.execute("UPDATE entries SET category=NULL WHERE category=?", (category_name,))
+            
+        # Delete the actual category
+        c.execute("DELETE FROM categories WHERE id=?", (category_id,))
+        self.conn.commit()
