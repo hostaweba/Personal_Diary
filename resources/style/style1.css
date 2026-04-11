@@ -12,7 +12,7 @@ body {
   color: #ECEFF4;
   font-family: "Dancing Script", cursive;
   font-size: 28px;             /* large handwriting-like base */
-  line-height: 1.3;
+  line-height: 1.2;
   padding: 0.5rem;
   letter-spacing: 0.5px;
 }
@@ -36,60 +36,149 @@ h5 { font-size: 3.0rem; color: #C77DFF; }   /* purple */
 h6 { font-size: 2.0rem; color: #FF8FAB; }   /* pink */
 
 /* ===========================
-   Paragraphs & Lists
+   Paragraphs
    =========================== */
-p, li {
-  white-space: pre-wrap;
+p {
+  margin: 0;           /* Must remain 0 */
+  font-size: 1.6rem;
+  white-space: pre-wrap; 
   word-break: break-word;
-  margin: 0.6rem 0;
-  font-size: 1.6rem;   /* bigger than default body (readable cursive) */
 }
 
+/* ===========================
+   Lists (Up to 6 Levels Deep)
+   =========================== */
 ul, ol {
-  padding-left: 1.8rem;
-  margin: 0.8rem 0;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  margin-left: 45px; /* Critical: Forces bullets to render onscreen in Qt */
+  font-size: 1.6rem;
 }
 
 li {
-  margin: 0.4rem 0;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 
+/* Base list types */
+ul { list-style-type: disc; }
+ol { list-style-type: decimal; }
+
+/* Level 2 */
+ul ul, ol ul { list-style-type: circle; margin-left: 30px; }
+ol ol, ul ol { list-style-type: lower-alpha; margin-left: 30px; }
+
+/* Level 3 */
+ul ul ul, ol ol ul { list-style-type: square; margin-left: 30px; }
+ol ol ol, ul ul ol { list-style-type: lower-roman; margin-left: 30px; }
+
+/* Level 4 */
+ul ul ul ul { list-style-type: disc; margin-left: 30px; }
+ol ol ol ol { list-style-type: upper-alpha; margin-left: 30px; }
+
+/* Level 5 */
+ul ul ul ul ul { list-style-type: circle; margin-left: 30px; }
+ol ol ol ol ol { list-style-type: upper-roman; margin-left: 30px; }
+
+/* Level 6 */
+ul ul ul ul ul ul { list-style-type: square; margin-left: 30px; }
+ol ol ol ol ol ol { list-style-type: decimal; margin-left: 30px; }
+
 /* ===========================
-   Links
+   Task Lists (Checkboxes)
    =========================== */
-a {
-  color: #88C0D0;
-  text-decoration: none;
-  transition: color 0.25s ease;
-  font-size: 1.35rem;
+ul.task-list {
+  list-style-type: none; /* Removes standard bullet from the container */
+  margin-left: 20px;
 }
 
-a:hover {
-  text-decoration: underline;
-  color: #81A1C1;
+li.task-list-item {
+  list-style-type: none; /* Removes bullet from individual items */
+  margin-left: 0;
 }
 
 /* ===========================
-   Code
+   Formatting & Typography
+   =========================== */
+strong, b { font-weight: bold; color: #FFD93D; }
+em, i { font-style: italic; color: #FF8FAB; }
+
+/* Strikethrough */
+del, s { text-decoration: line-through; color: rgba(236, 239, 244, 0.4); }
+
+/* Underline / Inserted */
+ins, u { text-decoration: underline; color: #88C0D0; }
+
+/* Highlighter */
+mark { 
+  background: rgba(255, 217, 61, 0.35); 
+  color: #FFD93D; 
+  padding: 2px 6px; 
+  border-radius: 4px; 
+}
+
+/* Subscript & Superscript */
+sup { font-size: 0.6em; vertical-align: super; color: #A3BE8C; }
+sub { font-size: 0.6em; vertical-align: sub; color: #A3BE8C; }
+
+/* Keyboard Keys */
+kbd {
+  background-color: #2e3440;
+  color: #EBCB8B;
+  font-family: "Fira Code", monospace;
+  font-size: 1.1rem;
+  padding: 2px 8px;
+  border: 1px solid #4c566a;
+  border-bottom: 2px solid #4c566a;
+  border-radius: 4px;
+}
+
+/* Links */
+a { color: #88C0D0; text-decoration: none; font-size: 1.4rem; }
+a:hover { text-decoration: underline; color: #81A1C1; }
+
+/* ===========================
+   Code Blocks
    =========================== */
 code, pre {
-  font-family: "Fira Code", monospace;
+  font-family: "Fira Code", "Consolas", monospace;
   font-size: 1.1rem;
 }
 
 pre {
-  background: rgba(0,0,0,0.35);
+  background: rgba(20, 22, 26, 0.8);
   padding: 14px 16px;
   border-radius: 12px;
-  overflow-x: auto;
-  margin: 1.2rem 0;
-  box-shadow: inset 0 0 8px rgba(0,0,0,0.2);
+  margin-top: 15px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 code {
-  background: rgba(0,0,0,0.35);
-  padding: 3px 8px;
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #A3BE8C;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* ===========================
+   Blockquotes
+   =========================== */
+blockquote {
+  font-family: "Dancing Script", cursive;
+  font-size: 1.8rem;
+  color: #D8DEE9;
+  border-left: 5px solid #FFD93D;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  padding: 5px 15px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+blockquote blockquote {
+  border-left: 5px solid #6BCB77;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* ===========================
@@ -117,7 +206,7 @@ th {
 }
 
 /* ===========================
-   Blockquotes
+   Blockquotes  (repeaded 167) --in use and earlier definition is useless
    =========================== */
 blockquote {
   font-family: "Dancing Script", cursive;
@@ -162,7 +251,7 @@ hr {
 /* ===========================
    Special Elements
    =========================== */
-.task-list-item {
+.task-list-item {  /* (repeaded) 96 --in use */
   list-style: none;
   font-size: 1.35rem;
 }
@@ -171,17 +260,17 @@ hr {
   margin-right: 8px;
 }
 
-strong {
+strong {  /* (repeaded) 104 same properties --in use */
   font-weight: bold;
   color: #FFD93D;
 }
 
-em {
+em {  /* (repeaded) 105 same properties --in use */
   font-style: italic;
   color: #FF8FAB;
 }
 
-mark {
+mark {  /* (repeaded) 114 --in use */
   background: rgba(255, 221, 87, 0.4);
   padding: 0 5px;
   border-radius: 4px;
@@ -203,3 +292,8 @@ summary {
   color: #FFD93D;
 }
 
+/* ===========================
+   Most of the First Entry (Lines 167-175). 
+   Its values for color, margin, padding, and background are completely overwritten and 
+   ignored by the browser.
+   =========================== */
