@@ -1172,8 +1172,7 @@ class DiaryApp(QMainWindow):
         act_settings = QAction("Settings", self, triggered=self.open_settings)
         act_help = QAction("Help", self, triggered=self.open_help, shortcut="F1")
 
-        ribbon_actions = [act_new, self.act_view, self.act_wrap, self.act_focus, self.act_sidebar, act_dash, act_settings, act_help]
-        
+        ribbon_actions = [act_new, self.act_wrap, self.act_view, self.act_sidebar, act_dash, self.act_focus, act_settings, act_help]
         for a in ribbon_actions:
             self.tb.addAction(a)
             self.addAction(a) 
