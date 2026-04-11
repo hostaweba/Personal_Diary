@@ -414,6 +414,7 @@ class HelpDialog(QDialog):
             ("Ctrl + T", "Add New Tag"),
             ("Ctrl + B", "Toggle Sidebar Pane"),
             ("Ctrl + E", "Toggle Editor/Preview View"),
+            ("Alt + Z", "Toggle Wrap"),
             ("F11", "Toggle Focus Mode (Fullscreen)"),
             ("F10", "Toggle Ribbon (Toolbar)"),
             ("F1", "Show Help Menu")
@@ -1140,32 +1141,44 @@ class DiaryApp(QMainWindow):
         self.folder_combo.currentIndexChanged.connect(self._on_folder_changed)
         self.tb.addWidget(self.folder_combo)
 
-        act_new = QAction("New", self, triggered=self.new_entry, shortcut="Ctrl+N")
+        # ---------------------------------------------------------
+        # BACKGROUND SHORTCUTS ONLY (Removed from Ribbon)
+        # ---------------------------------------------------------
         act_save = QAction("Save", self, triggered=self.save_entry, shortcut="Ctrl+S")
         act_del = QAction("Delete", self, triggered=self.delete_entry, shortcut="Del")
         act_img = QAction("Image", self, triggered=self.add_image)
         act_tag = QAction("Tag", self, triggered=self.add_tag, shortcut="Ctrl+T")
-        
-        self.act_view = QAction("Toggle View", self, triggered=self.toggle_preview_view, shortcut="Ctrl+E")
-        self.act_focus = QAction("Focus Mode", self, triggered=self.toggle_focus, shortcut="F11")
-        self.act_sidebar = QAction("Toggle Pane", self, triggered=self.toggle_sidebar, shortcut="Ctrl+B")
-        
-        self.act_ribbon = self.tb.toggleViewAction()
-        self.act_ribbon.setText("Toggle Ribbon")
-        self.act_ribbon.setShortcut("F10")
-        
         act_search = QAction("Search", self, shortcut="Ctrl+F")
         act_search.triggered.connect(self.search_bar.setFocus)
         
-        act_help = QAction("Help", self, triggered=self.open_help, shortcut="F1")
+        for a in (act_save, act_del, act_img, act_tag, act_search):
+            self.addAction(a) # Adds shortcut listener without adding to toolbar
+
+        # ---------------------------------------------------------
+        # VISIBLE RIBBON ACTIONS (With Dynamic Names)
+        # ---------------------------------------------------------
+        act_new = QAction("New Entry", self, triggered=self.new_entry, shortcut="Ctrl+N")
+        
+        self.act_wrap = QAction("Unwrap Text", self, triggered=self.toggle_text_wrap, shortcut="Alt+Z")
+        self.act_view = QAction("View: Split", self, triggered=self.toggle_preview_view, shortcut="Ctrl+E")
+        self.act_sidebar = QAction("Hide Sidebar", self, triggered=self.toggle_sidebar, shortcut="Ctrl+B")
+        self.act_focus = QAction("Enter Focus", self, triggered=self.toggle_focus, shortcut="F11")
+        
+        self.act_ribbon = self.tb.toggleViewAction()
+        self.act_ribbon.setText("Hide Ribbon")
+        self.act_ribbon.setShortcut("F10")
+        
         act_dash = QAction("Dashboard", self, triggered=self.open_dashboard)
         act_settings = QAction("Settings", self, triggered=self.open_settings)
+        act_help = QAction("Help", self, triggered=self.open_help, shortcut="F1")
 
-        all_actions = [act_new, act_save, act_del, act_img, act_tag, self.act_view, self.act_focus, self.act_sidebar, self.act_ribbon, act_help, act_dash, act_settings, act_search]
-        for a in all_actions:
-            if a not in (self.act_ribbon, act_search):
-                self.tb.addAction(a)
+        ribbon_actions = [act_new, self.act_view, self.act_wrap, self.act_focus, self.act_sidebar, act_dash, act_settings, act_help]
+        
+        for a in ribbon_actions:
+            self.tb.addAction(a)
             self.addAction(a) 
+            
+        self.addAction(self.act_ribbon)
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -1219,7 +1232,11 @@ class DiaryApp(QMainWindow):
         QTimer.singleShot(2500, lambda: self.status_label.setText(""))
 
     def toggle_sidebar(self):
-        self.sidebar.setVisible(not self.sidebar.isVisible())
+        is_visible = not self.sidebar.isVisible()
+        self.sidebar.setVisible(is_visible)
+        
+        # Dynamically rename the button
+        self.act_sidebar.setText("Hide Sidebar" if is_visible else "Show Sidebar")
 
     def toggle_preview_view(self):
         self.view_mode = (self.view_mode + 1) % 3
@@ -1235,17 +1252,32 @@ class DiaryApp(QMainWindow):
             self.text_editor.setVisible(False)
             self.preview.setVisible(True)
             self.act_view.setText("View: Preview")
+
+    def toggle_text_wrap(self):
+        self.is_wrapped = getattr(self, "is_wrapped", True)
+        self.is_wrapped = not self.is_wrapped
+        
+        mode = QTextEdit.WidgetWidth if self.is_wrapped else QTextEdit.NoWrap
+        self.text_editor.setLineWrapMode(mode)
+        self.preview.setLineWrapMode(mode)
+        
+        # Dynamically rename the button
+        self.act_wrap.setText("Unwrap Text" if self.is_wrapped else "Wrap Text")
+        self.show_status(f"Text Wrap: {'ON' if self.is_wrapped else 'OFF'}")
             
     def toggle_focus(self):
         self.focus_mode = not self.focus_mode
         self.sidebar.setVisible(not self.focus_mode)
         self.right_stats.setVisible(self.focus_mode)
         
+        # Ensure sidebar button text stays accurate when focus mode overrides it
+        self.act_sidebar.setText("Show Sidebar" if self.focus_mode else "Hide Sidebar")
+        
         if self.focus_mode:
             self.act_focus.setText("Exit Focus")
             self.showFullScreen()
         else:
-            self.act_focus.setText("Focus Mode")
+            self.act_focus.setText("Enter Focus")
             self.showNormal()
 
     def open_settings(self):
@@ -1321,6 +1353,7 @@ class DiaryApp(QMainWindow):
         self.preview_timer.start(PREVIEW_DEBOUNCE_MS)
 
     def update_preview(self):
+        import re
         e_scroll = self.text_editor.verticalScrollBar()
         p_scroll = self.preview.verticalScrollBar()
         e_val, e_max = e_scroll.value(), e_scroll.maximum()
@@ -1330,20 +1363,55 @@ class DiaryApp(QMainWindow):
         fmt = getattr(self.current_entry, "format", "markdown") if self.current_entry else "markdown"
         text = self.text_editor.toPlainText()
 
+        # Handle Images
         for uid, (_, _, b64) in self.entry_images.items():
             text = text.replace(f"(image://{uid})", f"(data:image/png;base64,{b64})")
             text = text.replace(f"image://{uid}", f"data:image/png;base64,{b64})")
 
         if fmt == "text":
             safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-            html = f"<html><head><style>{MARKDOWN_CSS}</style></head><body><pre style='font-family:inherit;border:none'>{safe}</pre></body></html>"
+            html_body = f"<pre style='font-family:inherit;border:none'>{safe}</pre>"
         else:
-            html = f"<html><head><style>{MARKDOWN_CSS}</style></head><body>{markdown2.markdown(text, extras=MARKDOWN_EXTRAS)}</body></html>"
+            # 1. Protect 3+ consecutive "Enters" from being deleted by Markdown
+            def protect_newlines(match):
+                n = len(match.group(0))
+                return '\n\n' + '@@NL@@' * (n - 2)
+            text = re.sub(r'\n{3,}', protect_newlines, text)
+            
+            # 2. Render Markdown natively (break-on-newline enabled)
+            html_body = markdown2.markdown(text, extras=MARKDOWN_EXTRAS)
+            
+            # 3. THE HEIGHT FIX: Merge paragraphs to force strict 1:1 line-height rendering
+            # This replaces the default paragraph gaps with exact font-sized line breaks.
+            html_body = html_body.replace("</p>\n\n<p>", "<br><br>")
+            html_body = html_body.replace("</p>\n<p>", "<br><br>")
+            
+            # 4. Restore the protected 3+ Enters
+            html_body = html_body.replace("@@NL@@", "<br>")
+            
+            # 5. Clean up break-on-newline artifacts so it maps 1:1
+            html_body = html_body.replace("<br />\n", "<br />")
+            html_body = html_body.replace("</li><br />", "</li>")
+            html_body = html_body.replace("<ul><br />", "<ul>")
+            html_body = html_body.replace("</ul><br />", "</ul>")
+            html_body = html_body.replace("<ol><br />", "<ol>")
+            html_body = html_body.replace("</ol><br />", "</ol>")
+
+        # 6. Swap out the invisible HTML checkboxes for styled Unicode ones
+        unchecked = '<span style="color:#81A1C1; font-size:1.1em; font-family: Segoe UI, sans-serif;">☐</span>'
+        checked = '<span style="color:#A3BE8C; font-size:1.1em; font-family: Segoe UI, sans-serif;">☑</span>'
+        html_body = html_body.replace('<input type="checkbox" class="task-list-item-checkbox" disabled>', unchecked)
+        html_body = html_body.replace('<input type="checkbox" class="task-list-item-checkbox" disabled="disabled">', unchecked)
+        html_body = html_body.replace('<input type="checkbox" class="task-list-item-checkbox" checked disabled>', checked)
+        html_body = html_body.replace('<input type="checkbox" class="task-list-item-checkbox" checked="checked" disabled="disabled">', checked)
+
+        # 7. Wrap it in your CSS
+        html = f"<html><head><style>{MARKDOWN_CSS}</style></head><body>{html_body}</body></html>"
 
         self._syncing_scroll = True
         p_scroll.blockSignals(True)
-        
         self.preview.setHtml(html)
+
 
         # Handle word count stats
         if self.app_config.get("show_stats", True):
@@ -1357,7 +1425,7 @@ class DiaryApp(QMainWindow):
                 time_str = f"{math.ceil(words / 200)} min read"
             self.editor_footer.setText(f"{words:,} Words  •  {time_str}")
 
-        # Async layout recalculation
+        # Async layout recalculation (prevents the scrollbar from hiding your text)
         def apply_scroll():
             if is_at_bottom:
                 p_scroll.setValue(p_scroll.maximum())
@@ -1366,8 +1434,7 @@ class DiaryApp(QMainWindow):
             p_scroll.blockSignals(False)
             self._syncing_scroll = False
 
-        # Give the layout engine 20ms to process the new HTML and calculate maximum scroll height
-        QTimer.singleShot(20, apply_scroll) 
+        QTimer.singleShot(20, apply_scroll)
 
         if self.app_config.get("show_stats", True):
             rendered_text = self.preview.toPlainText().strip()
